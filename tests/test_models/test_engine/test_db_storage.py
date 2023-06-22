@@ -1,175 +1,130 @@
 #!/usr/bin/python3
-''' module for file_storage tests '''
+"""Module for testing DBStorage"""
+
 import unittest
 import MySQLdb
-from models.user import User
-from models import storage
-from datetime import datetime
 import os
+import sqlalchemy
 
-@unittest.skipIf(os.getenv('HBNB_TYPE_STORAGE') != 'db',
-                 'db_storage test not supported')
+from models.engine.db_storage import DBStorage
+from models import storage
+from models.user import User
+from models.state import State
+from models.city import City
+
+STORAGE_TYPE = os.environ.get("HBNB_TYPE_STORAGE")
+
+
+@unittest.skipUnless(STORAGE_TYPE == "db", "Not testing database storage")
 class TestDBStorage(unittest.TestCase):
-    '''testing dbstorage engine'''
-    def test_new_and_save(self):
-        '''testing  the new and save methods'''
-        db = MySQLdb.connect(user=os.getenv('HBNB_MYSQL_USER'),
-                             host=os.getenv('HBNB_MYSQL_HOST'),
-                             passwd=os.getenv('HBNB_MYSQL_PWD'),
-                             port=3306,
-                             db=os.getenv('HBNB_MYSQL_DB'))
-        new_user = User(**{'first_name': 'jack',
-                           'last_name': 'bond',
-                           'email': 'jack@bond.com',
-                           'password': 12345})
-        cur = db.cursor()
-        cur.execute('SELECT COUNT(*) FROM users')
-        old_count = cur.fetchall()
-        cur.close()
-        db.close()
-        new_user.save()
-        db = MySQLdb.connect(user=os.getenv('HBNB_MYSQL_USER'),
-                             host=os.getenv('HBNB_MYSQL_HOST'),
-                             passwd=os.getenv('HBNB_MYSQL_PWD'),
-                             port=3306,
-                             db=os.getenv('HBNB_MYSQL_DB'))
-        cur = db.cursor()
-        cur.execute('SELECT COUNT(*) FROM users')
-        new_count = cur.fetchall()
-        self.assertEqual(new_count[0][0], old_count[0][0] + 1)
-        cur.close()
-        db.close()
+    """Test DBStorage methods"""
 
-    def test_new(self):
-        """ New object is correctly added to database """
-        new = User(
-            email='john2020@gmail.com',
-            password='password',
-            first_name='John',
-            last_name='Zoldyck'
-        )
-        self.assertFalse(new in storage.all().values())
-        new.save()
-        self.assertTrue(new in storage.all().values())
-        dbc = MySQLdb.connect(
-            host=os.getenv('HBNB_MYSQL_HOST'),
-            port=3306,
-            user=os.getenv('HBNB_MYSQL_USER'),
-            passwd=os.getenv('HBNB_MYSQL_PWD'),
-            db=os.getenv('HBNB_MYSQL_DB')
-        )
-        cursor = dbc.cursor()
-        cursor.execute('SELECT * FROM users WHERE id="{}"'.format(new.id))
-        result = cursor.fetchone()
-        self.assertTrue(result is not None)
-        self.assertIn('john2020@gmail.com', result)
-        self.assertIn('password', result)
-        self.assertIn('John', result)
-        self.assertIn('Zoldyck', result)
-        cursor.close()
-        dbc.close()
+    @staticmethod
+    def __create_db_connection():
+        """create a new database connection"""
+        options = {
+            "host": os.environ.get("HBNB_MYSQL_HOST"),
+            "user": os.environ.get("HBNB_MYSQL_USER"),
+            "password": os.environ.get("HBNB_MYSQL_PWD"),
+            "database": os.environ.get("HBNB_MYSQL_DB"),
+        }
+        return MySQLdb.connect(**options)
+
+    @staticmethod
+    def __count(tablename):
+        """Return the number of items in the given table
+
+        Args:
+            tablename (str): table name.
+        """
+        conn = TestDBStorage.__create_db_connection()
+        cur = conn.cursor()
+        # Using format. Not safe.
+        cur.execute("""SELECT * FROM {}""".format(tablename))
+        count = len(cur.fetchall())
+        cur.close()
+        conn.close()
+
+        return count
+
+    def test_storage_type(self):
+        """Test that storage is an instance of DBStorage"""
+        self.assertTrue(type(storage), DBStorage)
+
+    def test_new_and_save(self):
+        """Test that the new and save methods add a new object
+        to the database"""
+
+        count1 = self.__count("users")
+        new_user = User(email="DBStorage", password="1234")
+        storage.new(new_user)
+        storage.save()
+        count2 = self.__count("users")
+        self.assertTrue(count2 - count1, 1)
+
+    def test_all_without_class(self):
+        """Test that the all method returns dictionary of all objects"""
+
+        objs_dict = storage.all()
+        for key, value in objs_dict.items():
+            with self.subTest(key=key):
+                self.assertTrue('.' in key)
+                self.assertEqual(key.split('.')[0], value.__class__.__name__)
+                self.assertEqual(key.split('.')[1], value.id)
+
+    def test_all_with_class(self):
+        """Test that all returns dictionary of objects in specified class"""
+
+        for _ in range(5):
+            State(name="DBStorage test all").save()
+
+        user_objs = storage.all(User)
+        for key, value in user_objs.items():
+            with self.subTest(key=key):
+                self.assertTrue('.' in key)
+                self.assertEqual(key.split('.')[0], "User")
+                self.assertEqual(key.split('.')[1], value.id)
 
     def test_delete(self):
-        """ Object is correctly deleted from database """
-        new = User(
-            email='john2020@gmail.com',
-            password='password',
-            first_name='John',
-            last_name='Zoldyck'
-        )
-        obj_key = 'User.{}'.format(new.id)
-        dbc = MySQLdb.connect(
-            host=os.getenv('HBNB_MYSQL_HOST'),
-            port=3306,
-            user=os.getenv('HBNB_MYSQL_USER'),
-            passwd=os.getenv('HBNB_MYSQL_PWD'),
-            db=os.getenv('HBNB_MYSQL_DB')
-        )
-        new.save()
-        self.assertTrue(new in storage.all().values())
-        cursor = dbc.cursor()
-        cursor.execute('SELECT * FROM users WHERE id="{}"'.format(new.id))
-        result = cursor.fetchone()
-        self.assertTrue(result is not None)
-        self.assertIn('john2020@gmail.com', result)
-        self.assertIn('password', result)
-        self.assertIn('John', result)
-        self.assertIn('Zoldyck', result)
-        self.assertIn(obj_key, storage.all(User).keys())
-        new.delete()
-        self.assertNotIn(obj_key, storage.all(User).keys())
-        cursor.close()
-        dbc.close()
+        """Test that delete removes the specified object from the database"""
 
-    def test_reload(self):
-        """ Tests the reloading of the database session """
-        dbc = MySQLdb.connect(
-            host=os.getenv('HBNB_MYSQL_HOST'),
-            port=3306,
-            user=os.getenv('HBNB_MYSQL_USER'),
-            passwd=os.getenv('HBNB_MYSQL_PWD'),
-            db=os.getenv('HBNB_MYSQL_DB')
-        )
-        cursor = dbc.cursor()
-        cursor.execute(
-            'INSERT INTO users(id, created_at, updated_at, email, password' +
-            ', first_name, last_name) VALUES(%s, %s, %s, %s, %s, %s, %s);',
-            [
-                '4447-by-me',
-                str(datetime.now()),
-                str(datetime.now()),
-                'ben_pike@yahoo.com',
-                'pass',
-                'Benjamin',
-                'Pike',
-            ]
-        )
-        self.assertNotIn('User.4447-by-me', storage.all())
-        dbc.commit()
-        storage.reload()
-        self.assertIn('User.4447-by-me', storage.all())
-        cursor.close()
-        dbc.close()
+        new_state = State(name="DBStorage test delete")
+        new_state.save()
 
-    def test_save(self):
-        """ object is successfully saved to database """
-        new = User(
-            email='john2020@gmail.com',
-            password='password',
-            first_name='John',
-            last_name='Zoldyck'
-        )
-        dbc = MySQLdb.connect(
-            host=os.getenv('HBNB_MYSQL_HOST'),
-            port=3306,
-            user=os.getenv('HBNB_MYSQL_USER'),
-            passwd=os.getenv('HBNB_MYSQL_PWD'),
-            db=os.getenv('HBNB_MYSQL_DB')
-        )
-        cursor = dbc.cursor()
-        cursor.execute('SELECT * FROM users WHERE id="{}"'.format(new.id))
-        result = cursor.fetchone()
-        cursor.execute('SELECT COUNT(*) FROM users;')
-        old_cnt = cursor.fetchone()[0]
-        self.assertTrue(result is None)
-        self.assertFalse(new in storage.all().values())
-        new.save()
-        dbc1 = MySQLdb.connect(
-            host=os.getenv('HBNB_MYSQL_HOST'),
-            port=3306,
-            user=os.getenv('HBNB_MYSQL_USER'),
-            passwd=os.getenv('HBNB_MYSQL_PWD'),
-            db=os.getenv('HBNB_MYSQL_DB')
-        )
-        cursor1 = dbc1.cursor()
-        cursor1.execute('SELECT * FROM users WHERE id="{}"'.format(new.id))
-        result = cursor1.fetchone()
-        cursor1.execute('SELECT COUNT(*) FROM users;')
-        new_cnt = cursor1.fetchone()[0]
-        self.assertFalse(result is None)
-        self.assertEqual(old_cnt + 1, new_cnt)
-        self.assertTrue(new in storage.all().values())
-        cursor1.close()
-        dbc1.close()
-        cursor.close()
-        dbc.close()
+        count1 = self.__count("states")
+        storage.delete(new_state)
+        storage.save()
+        count2 = self.__count("states")
+
+        self.assertEqual(count1 - count2, 1)
+
+    def test_delete_with_not_added_obj(self):
+        """Test that delete raises an exception if object is not
+        persisted in the session"""
+
+        new_state = State(name="DBStorage test delete")
+
+        with self.assertRaises(sqlalchemy.exc.InvalidRequestError):
+            storage.delete(new_state)
+
+    def test_delete_cascades(self):
+        """Test that delete does nothing if object is not specified"""
+
+        new_state = State(name="DBStorage test delete cascade")
+        new_state.save()
+        City(
+            name="DBStorage test delete cascade",
+            state_id=new_state.id
+        ).save()
+
+        city_count1 = self.__count("cities")
+        state_count1 = self.__count("states")
+
+        storage.delete(new_state)
+        storage.save()
+
+        city_count2 = self.__count("cities")
+        state_count2 = self.__count("states")
+
+        self.assertEqual(city_count1 - city_count2, 1)
+        self.assertEqual(state_count1 - state_count2, 1)
