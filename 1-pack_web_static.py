@@ -4,8 +4,10 @@
 Implements the do_pack function that creates a .tgz archive
 from the web_static directory
 """
+
 from fabric.api import local, settings, hide
 from datetime import datetime
+
 
 def do_pack():
     """
