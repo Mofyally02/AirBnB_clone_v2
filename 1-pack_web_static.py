@@ -1,13 +1,7 @@
 #!/usr/bin/python3
-
-"""
-Implements the do_pack function that creates a .tgz archive
-from the web_static directory
-"""
-
-from fabric.api import local, settings, hide
+""" This function compress a folder """
 from datetime import datetime
-
+from fabric.api import local
 
 def do_pack():
     """
