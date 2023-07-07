@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # Sets up web servers for the dployment of web_static
 
-[[ -z "$(which nginx)" ]] && {
-	sudo apt-get update -yqq
-	sudo apt-get install nginx -y
-}
+sudo apt-get -y update
+sudo apt-get -y upgrade
+sudo apt-get -y install nginx
 
 sudo mkdir -p /data/web_static/releases/test
 sudo mkdir -p /data/web_static/shared
