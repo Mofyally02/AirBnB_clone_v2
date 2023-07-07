@@ -1,112 +1,50 @@
 #!/usr/bin/python3
-"""
-Implements the deploy function that creates and distributes an archive
-to the web servers.
-"""
+""" Function that deploys """
 
 from fabric.api import env, local, put, run
 from datetime import datetime
-
-env.hosts = [
-    '100.25.41.254',
-    '100.26.212.218'
-]
-env.user = 'ubuntu'
+from os.path import exists, isdir
+env.hosts = ['35.237.96.82', '54.164.136.88']
 
 
-@runs_once
 def do_pack():
-    """
-    Generates a .tgz archive from the contents of the web_static
-    directory
-    """
-
-    # create versions directory if doesn't exist
-    with settings(
-        hide('warnings', 'running', 'stdout', 'stderr'),
-        warn_only=True
-    ):
-        if local('test -d versions').failed:
-            if local('mkdir versions').failed:
-                return None
-
-    # date in the format [<year> <month> <day> <hour> <minute> <second>]
-    date = datetime.now().strftime("%Y%m%d%H%M%S")
-
-    archive_path = f'versions/web_static_{date}.tgz'
-
-    print(f'Packing web_static to {archive_path}')
-    # Create archive for web_static in versions directory
-
-    if local(f'tar -cvzf {archive_path} web_static').failed:
+    """Creates a tgz archive using fabric"""
+    try:
+        date = datetime.now().strftime("%Y%m%d%H%M%S")
+        if isdir("versions") is False:
+            local("mkdir versions")
+        filename = "versions/web_static_{}.tgz".format(date)
+        local("tar -cvzf {} web_static".format(filename))
+        return filename
+    except Exception as ex:
         return None
-
-    return archive_path
 
 
 def do_deploy(archive_path):
-    """Distributes an archive to the web server.
-
-    Args:
-        archive_path (str): path to the archive.
-
-    Returns:
-        Boolean: True if all operations have been done successfully,
-            otherwise False is returned.
-    """
-    if not archive_path:
+    """deploy web static with fabric"""
+    if exists(archive_path) is False:
         return False
 
-    if local("test -f {}".format(archive_path)).failed:
+    try:
+        filename = archive_path.split("/")[-1]
+        no_excep = filename.split(".")[0]
+        path = "/data/web_static/releases/"
+        put(archive_path, '/tmp/')
+        run('sudo mkdir -p {}{}/'.format(path, no_excep))
+        run('sudo tar -xzf /tmp/{} -C {}{}/'.format(filename, path, no_excep))
+        run('sudo rm /tmp/{}'.format(filename))
+        run('sudo mv {0}{1}/web_static/* {0}{1}/'.format(path, no_excep))
+        run('sudo rm -rf {}{}/web_static'.format(path, no_excep))
+        run('sudo rm -rf /data/web_static/current')
+        run('sudo ln -s {}{}/ /data/web_static/current'.format(path, no_excep))
+        return True
+    except BaseException:
         return False
-
-    if put(archive_path, "/tmp/").failed:
-        return False
-
-    archive_filename = archive_path.split("/")[-1]
-    archive_dir = archive_filename.split(".")[0]
-
-    releases_dir = '/data/web_static/releases/'
-
-    # Create a directory for the current archive.
-    if run(f'mkdir {releases_dir}{archive_dir}').failed:
-        return False
-
-    if run(
-        f'tar -xzf /tmp/{archive_filename} -C {releases_dir}{archive_dir}'
-    ).failed:
-        return False
-
-    move_from = f'{releases_dir}{archive_dir}/web_static/*'
-    move_to = f'{releases_dir}{archive_dir}'
-
-    # Move all files in the uncompressed web_static folder to the
-    # parent directory that is named after the archive.
-    if run(f'mv {move_from} {move_to}').failed:
-        return False
-
-    # Delete the empty folder remaining after moving the files.
-    if run(f'rm -fr {releases_dir}{archive_dir}/web_static').failed:
-        return False
-
-    # Delete the archive.
-    if run(f'rm -f /tmp/{archive_filename}').failed:
-        return False
-
-    if run(
-        f'ln -sf {releases_dir}{archive_dir} /data/web_static/current'
-    ).failed:
-        return False
-
-    print("New version deployed!")
-    return True
 
 
 def deploy():
-    """Creates and distributes an archive to the web servers"""
-
+    """ do path an do deploy"""
     archive_path = do_pack()
-    if not archive_path:
+    if archive_path is None:
         return False
-
     return do_deploy(archive_path)
