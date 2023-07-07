@@ -6,7 +6,6 @@ to the web servers.
 
 from fabric.api import env, local, put, run
 from datetime import datetime
-from os.path import exists, isdir
 
 env.hosts = [
     '100.25.41.254',
