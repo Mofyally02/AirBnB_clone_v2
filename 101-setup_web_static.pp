@@ -2,40 +2,61 @@
 
 exec {'update server':
   provider => shell,
-  command  => 'sudo apt-get update -y'
+  command  => 'sudo apt-get -y update',
+  before   => Exec['install Nginx'],
 }
 
-package { 'nginx':
-  ensure => installed,
-  before => Exec['update server'],
-}
-
-exec { 'create /data/':
+exec {'install Nginx':
   provider => shell,
-  command  => 'mkdir -p /data/web_static/releases/test/ /data/web_static/shared/'
+  command  => 'sudo apt-get -y install nginx',
+  before   => Exec['start Nginx'],
 }
 
-exec { 'change owner':
+exec {'start Nginx':
   provider => shell,
-  command  => 'sudo chown -hR ubuntu:ubuntu /data/'
+  command  => 'sudo service nginx start',
+  before   => Exec['create first directory'],
 }
 
-file { '/data/web_static/releases/test/index.html':
-  ensure  => present,
-  content => 'Test web_static'
-}
-
-exec { 'create current symlink':
+exec {'create first directory':
   provider => shell,
-  command  => 'ln -fs /data/web_static/releases/test/ /data/web_static/current'
+  command  => 'sudo mkdir -p /data/web_static/releases/test/',
+  before   => Exec['create second directory'],
 }
 
-exec { 'update nginx configuration':
+exec {'create second directory':
   provider => shell,
-  command  => 'sed -i "53i\ \n\tlocation /hbnb_static {\n\t\talias /data/web_static/current/;\n\t}\n" /etc/nginx/sites-available/default',
-  notify   => Service['nginx'],
+  command  => 'sudo mkdir -p /data/web_static/shared/',
+  before   => Exec['content into html'],
 }
 
-service { 'nginx':
-  ensure => running
+exec {'content into html':
+  provider => shell,
+  command  => 'echo "Holberton School" | sudo tee /data/web_static/releases/test/index.html',
+  before   => Exec['symbolic link'],
+}
+
+exec {'symbolic link':
+  provider => shell,
+  command  => 'sudo ln -sf /data/web_static/releases/test/ /data/web_static/current',
+  before   => Exec['put location'],
+}
+
+exec {'put location':
+  provider => shell,
+  command  => 'sudo sed -i \'38i\\tlocation /hbnb_static/ {\n\t\talias /data/web_static/current/;\n\t\tautoindex off;\n\t}\n\' /etc/nginx/sites-available/default',
+  before   => Exec['restart Nginx'],
+}
+
+exec {'restart Nginx':
+  provider => shell,
+  command  => 'sudo service nginx restart',
+  before   => File['/data/']
+}
+
+file {'/data/':
+  ensure  => directory,
+  owner   => 'ubuntu',
+  group   => 'ubuntu',
+  recurse => true,
 }
