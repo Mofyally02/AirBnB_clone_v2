@@ -4,12 +4,13 @@ Implements the deploy function that creates and distributes an archive
 to the web servers.
 """
 
-from fabric.api import *
+from fabric.api import env, local, put, run
 from datetime import datetime
+from os.path import exists, isdir
 
 env.hosts = [
-    '34.204.60.232',
-    '54.160.126.236'
+    '100.25.41.254',
+    '100.26.212.218'
 ]
 env.user = 'ubuntu'
 
