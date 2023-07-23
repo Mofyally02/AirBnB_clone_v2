@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<HTML lang="en">
+
+<HEAD>
+    <TITLE>AirBnB_clone</TITLE>
+    <LINK href="/static/styles/4-common.css" rel="stylesheet">
+    <LINK href="/static/styles/3-header.css" rel="stylesheet">
+    <LINK href="/static/styles/3-footer.css" rel="stylesheet">
+    <LINK href="/static/styles/6-filters.css" rel="stylesheet">
+    <LINK href="/static/images/icon.ico" rel="icon" type="image/png">
+</HEAD>
+
+<BODY>
+    <HEADER>
+    </HEADER>
+    <DIV class="container">
+        <SECTION class="filters">
+            <DIV class="locations">
+                <DIV class="filter_placeholder">
+                    <H3>States</H3>
+                    <H4>&nbsp;</H4>
+                </DIV>
+                <DIV class="popover">
+                    <UL class="popover_content">
+					{% for state in states|sort(attribute='name') %}
+                        <LI class="popover_item">
+                            <H2 class="state_name">{{ state.name }}</H2>
+                            <UL class="popover_content">
+							{% for city in state.cities|sort(attribute='name') %}
+                                <LI class="popover_item">{{ city.name }}</LI>
+							{% endfor %}
+                            </UL>
+                        </LI>
+					{% endfor %}
+                    </UL>
+                </DIV>
+            </DIV>
+            <DIV class="amenities">
+                <DIV class="filter_placeholder">
+                    <H3>Amenities</H3>
+                    <H4>&nbsp;</H4>
+                </DIV>
+                <DIV class="popover">
+                    <UL class="popover_content">
+					{% for amenity in amenities|sort(attribute='name') %}
+                        <LI class="popover_item">{{ amenity.name }}</LI>
+					{% endfor %}
+                    </UL>
+                </DIV>
+            </DIV>
+            <BUTTON>Search</BUTTON>
+        </SECTION>
+    </DIV>
+    <FOOTER>
+        <P>Best School</P>
+    </FOOTER>
+</BODY>
+
+</HTML>
