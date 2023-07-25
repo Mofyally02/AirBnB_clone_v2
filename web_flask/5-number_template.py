@@ -1,4 +1,7 @@
 #!/usr/bin/python3
+"""
+Starts a Flask web application listening on 0.0.0.0 port 5000.
+"""
 
 from flask import Flask, render_template
 from markupsafe import escape
